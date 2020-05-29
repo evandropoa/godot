@@ -5,8 +5,8 @@
 /*                           GODOT ENGINE                                */
 /*                      https://godotengine.org                          */
 /*************************************************************************/
-/* Copyright (c) 2007-2018 Juan Linietsky, Ariel Manzur.                 */
-/* Copyright (c) 2014-2018 Godot Engine contributors (cf. AUTHORS.md)    */
+/* Copyright (c) 2007-2020 Juan Linietsky, Ariel Manzur.                 */
+/* Copyright (c) 2014-2020 Godot Engine contributors (cf. AUTHORS.md).   */
 /*                                                                       */
 /* Permission is hereby granted, free of charge, to any person obtaining */
 /* a copy of this software and associated documentation files (the       */
@@ -46,17 +46,12 @@
 #include "scene/gui/texture_rect.h"
 #include "scene/gui/tree.h"
 
-/**
-	@author Juan Linietsky <reduzio@gmail.com>
-*/
-
 class PropertyValueEvaluator;
 class CreateDialog;
 class PropertySelector;
 
 class EditorResourceConversionPlugin : public Reference {
-
-	GDCLASS(EditorResourceConversionPlugin, Reference)
+	GDCLASS(EditorResourceConversionPlugin, Reference);
 
 protected:
 	static void _bind_methods();
@@ -67,9 +62,8 @@ public:
 	virtual Ref<Resource> convert(const Ref<Resource> &p_resource) const;
 };
 
-class CustomPropertyEditor : public Popup {
-
-	GDCLASS(CustomPropertyEditor, Popup);
+class CustomPropertyEditor : public PopupPanel {
+	GDCLASS(CustomPropertyEditor, PopupPanel);
 
 	enum {
 		MAX_VALUE_EDITORS = 12,
@@ -81,7 +75,8 @@ class CustomPropertyEditor : public Popup {
 		OBJ_MENU_COPY = 4,
 		OBJ_MENU_PASTE = 5,
 		OBJ_MENU_NEW_SCRIPT = 6,
-		OBJ_MENU_SHOW_IN_FILE_SYSTEM = 7,
+		OBJ_MENU_EXTEND_SCRIPT = 7,
+		OBJ_MENU_SHOW_IN_FILE_SYSTEM = 8,
 		TYPE_BASE_ID = 100,
 		CONVERT_BASE_ID = 1000
 	};
@@ -171,30 +166,9 @@ public:
 
 	void set_read_only(bool p_read_only) { read_only = p_read_only; }
 
-	void set_value_evaluator(PropertyValueEvaluator *p_evaluator) { evaluator = p_evaluator; }
-
 	bool edit(Object *p_owner, const String &p_name, Variant::Type p_type, const Variant &p_variant, int p_hint, String p_hint_text);
 
 	CustomPropertyEditor();
-};
-
-class PropertyValueEvaluator : public ValueEvaluator {
-	GDCLASS(PropertyValueEvaluator, ValueEvaluator);
-
-	Object *obj;
-	ScriptLanguage *script_language;
-	String _build_script(const String &p_text);
-
-	_FORCE_INLINE_ double _default_eval(const String &p_text) {
-		return p_text.to_double();
-	}
-
-public:
-	void edit(Object *p_obj);
-	double eval(const String &p_text);
-
-	PropertyValueEvaluator();
-	~PropertyValueEvaluator();
 };
 
 #endif

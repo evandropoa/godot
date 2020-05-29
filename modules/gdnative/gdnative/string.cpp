@@ -5,8 +5,8 @@
 /*                           GODOT ENGINE                                */
 /*                      https://godotengine.org                          */
 /*************************************************************************/
-/* Copyright (c) 2007-2018 Juan Linietsky, Ariel Manzur.                 */
-/* Copyright (c) 2014-2018 Godot Engine contributors (cf. AUTHORS.md)    */
+/* Copyright (c) 2007-2020 Juan Linietsky, Ariel Manzur.                 */
+/* Copyright (c) 2014-2020 Godot Engine contributors (cf. AUTHORS.md).   */
 /*                                                                       */
 /* Permission is hereby granted, free of charge, to any person obtaining */
 /* a copy of this software and associated documentation files (the       */
@@ -30,7 +30,7 @@
 
 #include "gdnative/string.h"
 
-#include "core/string_db.h"
+#include "core/string_name.h"
 #include "core/ustring.h"
 #include "core/variant.h"
 
@@ -39,6 +39,10 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+static_assert(sizeof(godot_char_string) == sizeof(CharString), "CharString size mismatch");
+static_assert(sizeof(godot_string) == sizeof(String), "String size mismatch");
+static_assert(sizeof(godot_char_type) == sizeof(CharType), "CharType size mismatch");
 
 godot_int GDAPI godot_char_string_length(const godot_char_string *p_cs) {
 	const CharString *cs = (const CharString *)p_cs;
@@ -74,7 +78,7 @@ void GDAPI godot_string_new_with_wide_string(godot_string *r_dest, const wchar_t
 	memnew_placement(dest, String(p_contents, p_size));
 }
 
-wchar_t GDAPI *godot_string_operator_index(godot_string *p_self, const godot_int p_idx) {
+const wchar_t GDAPI *godot_string_operator_index(godot_string *p_self, const godot_int p_idx) {
 	String *self = (String *)p_self;
 	return &(self->operator[](p_idx));
 }
@@ -137,6 +141,7 @@ signed char GDAPI godot_string_nocasecmp_to(const godot_string *p_self, const go
 
 	return self->nocasecmp_to(*str);
 }
+
 signed char GDAPI godot_string_naturalnocasecmp_to(const godot_string *p_self, const godot_string *p_str) {
 	const String *self = (const String *)p_self;
 	const String *str = (const String *)p_str;
@@ -184,6 +189,20 @@ godot_bool GDAPI godot_string_ends_with(const godot_string *p_self, const godot_
 	const String *string = (const String *)p_string;
 
 	return self->ends_with(*string);
+}
+
+godot_int GDAPI godot_string_count(const godot_string *p_self, godot_string p_what, godot_int p_from, godot_int p_to) {
+	const String *self = (const String *)p_self;
+	String *what = (String *)&p_what;
+
+	return self->count(*what, p_from, p_to);
+}
+
+godot_int GDAPI godot_string_countn(const godot_string *p_self, godot_string p_what, godot_int p_from, godot_int p_to) {
+	const String *self = (const String *)p_self;
+	String *what = (String *)&p_what;
+
+	return self->countn(*what, p_from, p_to);
 }
 
 godot_int GDAPI godot_string_find(const godot_string *p_self, godot_string p_what) {
@@ -236,7 +255,12 @@ godot_int GDAPI godot_string_findmk_from_in_place(const godot_string *p_self, co
 		keys.write[i] = (*keys_proxy)[i];
 	}
 
-	return self->findmk(keys, p_from, r_key);
+	int key;
+	int ret = self->findmk(keys, p_from, &key);
+	if (r_key) {
+		*r_key = key;
+	}
+	return ret;
 }
 
 godot_int GDAPI godot_string_findn(const godot_string *p_self, godot_string p_what) {
@@ -1011,14 +1035,14 @@ uint32_t GDAPI godot_string_hash_utf8_chars_with_len(const wchar_t *p_str, godot
 	return String::hash(p_str, p_len);
 }
 
-godot_pool_byte_array GDAPI godot_string_md5_buffer(const godot_string *p_self) {
+godot_packed_byte_array GDAPI godot_string_md5_buffer(const godot_string *p_self) {
 	const String *self = (const String *)p_self;
 	Vector<uint8_t> tmp_result = self->md5_buffer();
 
-	godot_pool_byte_array result;
-	memnew_placement(&result, PoolByteArray);
-	PoolByteArray *proxy = (PoolByteArray *)&result;
-	PoolByteArray::Write proxy_writer = proxy->write();
+	godot_packed_byte_array result;
+	memnew_placement(&result, PackedByteArray);
+	PackedByteArray *proxy = (PackedByteArray *)&result;
+	uint8_t *proxy_writer = proxy->ptrw();
 	proxy->resize(tmp_result.size());
 
 	for (int i = 0; i < tmp_result.size(); i++) {
@@ -1036,14 +1060,14 @@ godot_string GDAPI godot_string_md5_text(const godot_string *p_self) {
 	return result;
 }
 
-godot_pool_byte_array GDAPI godot_string_sha256_buffer(const godot_string *p_self) {
+godot_packed_byte_array GDAPI godot_string_sha256_buffer(const godot_string *p_self) {
 	const String *self = (const String *)p_self;
 	Vector<uint8_t> tmp_result = self->sha256_buffer();
 
-	godot_pool_byte_array result;
-	memnew_placement(&result, PoolByteArray);
-	PoolByteArray *proxy = (PoolByteArray *)&result;
-	PoolByteArray::Write proxy_writer = proxy->write();
+	godot_packed_byte_array result;
+	memnew_placement(&result, PackedByteArray);
+	PackedByteArray *proxy = (PackedByteArray *)&result;
+	uint8_t *proxy_writer = proxy->ptrw();
 	proxy->resize(tmp_result.size());
 
 	for (int i = 0; i < tmp_result.size(); i++) {
@@ -1283,6 +1307,64 @@ godot_bool GDAPI godot_string_is_valid_ip_address(const godot_string *p_self) {
 	const String *self = (const String *)p_self;
 
 	return self->is_valid_ip_address();
+}
+
+godot_string GDAPI godot_string_dedent(const godot_string *p_self) {
+	const String *self = (const String *)p_self;
+	godot_string result;
+	String return_value = self->dedent();
+	memnew_placement(&result, String(return_value));
+
+	return result;
+}
+
+godot_string GDAPI godot_string_trim_prefix(const godot_string *p_self, const godot_string *p_prefix) {
+	const String *self = (const String *)p_self;
+	String *prefix = (String *)p_prefix;
+	godot_string result;
+	String return_value = self->trim_prefix(*prefix);
+	memnew_placement(&result, String(return_value));
+
+	return result;
+}
+
+godot_string GDAPI godot_string_trim_suffix(const godot_string *p_self, const godot_string *p_suffix) {
+	const String *self = (const String *)p_self;
+	String *suffix = (String *)p_suffix;
+	godot_string result;
+	String return_value = self->trim_suffix(*suffix);
+	memnew_placement(&result, String(return_value));
+
+	return result;
+}
+
+godot_string GDAPI godot_string_rstrip(const godot_string *p_self, const godot_string *p_chars) {
+	const String *self = (const String *)p_self;
+	String *chars = (String *)p_chars;
+	godot_string result;
+	String return_value = self->rstrip(*chars);
+	memnew_placement(&result, String(return_value));
+
+	return result;
+}
+
+godot_packed_string_array GDAPI godot_string_rsplit(const godot_string *p_self, const godot_string *p_divisor,
+		const godot_bool p_allow_empty, const godot_int p_maxsplit) {
+	const String *self = (const String *)p_self;
+	String *divisor = (String *)p_divisor;
+
+	godot_packed_string_array result;
+	memnew_placement(&result, PackedStringArray);
+	PackedStringArray *proxy = (PackedStringArray *)&result;
+	String *proxy_writer = proxy->ptrw();
+	Vector<String> tmp_result = self->rsplit(*divisor, p_allow_empty, p_maxsplit);
+	proxy->resize(tmp_result.size());
+
+	for (int i = 0; i < tmp_result.size(); i++) {
+		proxy_writer[i] = tmp_result[i];
+	}
+
+	return result;
 }
 
 #ifdef __cplusplus

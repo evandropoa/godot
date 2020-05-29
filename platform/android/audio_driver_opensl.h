@@ -5,8 +5,8 @@
 /*                           GODOT ENGINE                                */
 /*                      https://godotengine.org                          */
 /*************************************************************************/
-/* Copyright (c) 2007-2018 Juan Linietsky, Ariel Manzur.                 */
-/* Copyright (c) 2014-2018 Godot Engine contributors (cf. AUTHORS.md)    */
+/* Copyright (c) 2007-2020 Juan Linietsky, Ariel Manzur.                 */
+/* Copyright (c) 2014-2020 Godot Engine contributors (cf. AUTHORS.md).   */
 /*                                                                       */
 /* Permission is hereby granted, free of charge, to any person obtaining */
 /* a copy of this software and associated documentation files (the       */
@@ -38,9 +38,8 @@
 #include <SLES/OpenSLES_Android.h>
 
 class AudioDriverOpenSL : public AudioDriver {
-
 	bool active;
-	Mutex *mutex;
+	Mutex mutex;
 
 	enum {
 
@@ -54,13 +53,18 @@ class AudioDriverOpenSL : public AudioDriver {
 	int32_t *mixdown_buffer;
 	int last_free;
 
+	Vector<int16_t> rec_buffer;
+
 	SLPlayItf playItf;
+	SLRecordItf recordItf;
 	SLObjectItf sl;
 	SLEngineItf EngineItf;
 	SLObjectItf OutputMix;
 	SLVolumeItf volumeItf;
 	SLObjectItf player;
+	SLObjectItf recorder;
 	SLAndroidSimpleBufferQueueItf bufferQueueItf;
+	SLAndroidSimpleBufferQueueItf recordBufferQueueItf;
 	SLDataSource audioSource;
 	SLDataFormat_PCM pcm;
 	SLDataSink audioSink;
@@ -70,20 +74,20 @@ class AudioDriverOpenSL : public AudioDriver {
 	static AudioDriverOpenSL *s_ad;
 
 	void _buffer_callback(
-			SLAndroidSimpleBufferQueueItf queueItf
-			/*   SLuint32 eventFlags,
-	    const void * pBuffer,
-	    SLuint32 bufferSize,
-	    SLuint32 dataUsed*/
-	);
+			SLAndroidSimpleBufferQueueItf queueItf);
 
 	static void _buffer_callbacks(
 			SLAndroidSimpleBufferQueueItf queueItf,
-			/*SLuint32 eventFlags,
-	    const void * pBuffer,
-	    SLuint32 bufferSize,
-	    SLuint32 dataUsed,*/
 			void *pContext);
+
+	void _record_buffer_callback(
+			SLAndroidSimpleBufferQueueItf queueItf);
+
+	static void _record_buffer_callbacks(
+			SLAndroidSimpleBufferQueueItf queueItf,
+			void *pContext);
+
+	virtual Error capture_init_device();
 
 public:
 	void set_singleton();
@@ -99,6 +103,9 @@ public:
 	virtual void finish();
 
 	virtual void set_pause(bool p_pause);
+
+	virtual Error capture_start();
+	virtual Error capture_stop();
 
 	AudioDriverOpenSL();
 };

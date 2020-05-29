@@ -5,8 +5,8 @@
 /*                           GODOT ENGINE                                */
 /*                      https://godotengine.org                          */
 /*************************************************************************/
-/* Copyright (c) 2007-2018 Juan Linietsky, Ariel Manzur.                 */
-/* Copyright (c) 2014-2018 Godot Engine contributors (cf. AUTHORS.md)    */
+/* Copyright (c) 2007-2020 Juan Linietsky, Ariel Manzur.                 */
+/* Copyright (c) 2014-2020 Godot Engine contributors (cf. AUTHORS.md).   */
 /*                                                                       */
 /* Permission is hereby granted, free of charge, to any person obtaining */
 /* a copy of this software and associated documentation files (the       */
@@ -34,7 +34,6 @@
 #include "scene/gui/control.h"
 
 class Container : public Control {
-
 	GDCLASS(Container, Control);
 
 	bool pending_sort;
@@ -56,6 +55,8 @@ public:
 	};
 
 	void fit_child_in_rect(Control *p_child, const Rect2 &p_rect);
+
+	virtual String get_configuration_warning() const;
 
 	Container();
 };

@@ -5,8 +5,8 @@
 /*                           GODOT ENGINE                                */
 /*                      https://godotengine.org                          */
 /*************************************************************************/
-/* Copyright (c) 2007-2018 Juan Linietsky, Ariel Manzur.                 */
-/* Copyright (c) 2014-2018 Godot Engine contributors (cf. AUTHORS.md)    */
+/* Copyright (c) 2007-2020 Juan Linietsky, Ariel Manzur.                 */
+/* Copyright (c) 2014-2020 Godot Engine contributors (cf. AUTHORS.md).   */
 /*                                                                       */
 /* Permission is hereby granted, free of charge, to any person obtaining */
 /* a copy of this software and associated documentation files (the       */
@@ -53,7 +53,6 @@ static GLView *_instance = NULL;
 
 static bool video_found_error = false;
 static bool video_playing = false;
-static float video_previous_volume = 0.0f;
 static CMTime video_current_time;
 
 void _show_keyboard(String);
@@ -85,7 +84,8 @@ Rect2 _get_ios_window_safe_area(float p_window_width, float p_window_height) {
 	}
 	ERR_FAIL_COND_V(insets.left < 0 || insets.top < 0 || insets.right < 0 || insets.bottom < 0,
 			Rect2(0, 0, p_window_width, p_window_height));
-	return Rect2(insets.left, insets.top, p_window_width - insets.right - insets.left, p_window_height - insets.bottom - insets.top);
+	UIEdgeInsets window_insets = UIEdgeInsetsMake(_points_to_pixels(insets.top), _points_to_pixels(insets.left), _points_to_pixels(insets.bottom), _points_to_pixels(insets.right));
+	return Rect2(window_insets.left, window_insets.top, p_window_width - window_insets.right - window_insets.left, p_window_height - window_insets.bottom - window_insets.top);
 }
 
 bool _play_video(String p_path, float p_volume, String p_audio_track, String p_subtitle_track) {
@@ -174,7 +174,6 @@ void _focus_out_video() {
 };
 
 void _unpause_video() {
-
 	[_instance.avPlayer play];
 	video_playing = true;
 };
@@ -207,14 +206,12 @@ static const int max_touches = 8;
 static UITouch *touches[max_touches];
 
 static void init_touches() {
-
 	for (int i = 0; i < max_touches; i++) {
 		touches[i] = NULL;
 	};
 };
 
 static int get_touch_id(UITouch *p_touch) {
-
 	int first = -1;
 	for (int i = 0; i < max_touches; i++) {
 		if (first == -1 && touches[i] == NULL) {
@@ -234,10 +231,8 @@ static int get_touch_id(UITouch *p_touch) {
 };
 
 static int remove_touch(UITouch *p_touch) {
-
 	int remaining = 0;
 	for (int i = 0; i < max_touches; i++) {
-
 		if (touches[i] == NULL)
 			continue;
 		if (touches[i] == p_touch)
@@ -248,20 +243,8 @@ static int remove_touch(UITouch *p_touch) {
 	return remaining;
 };
 
-static int get_first_id(UITouch *p_touch) {
-
-	for (int i = 0; i < max_touches; i++) {
-
-		if (touches[i] != NULL)
-			return i;
-	};
-	return -1;
-};
-
 static void clear_touches() {
-
 	for (int i = 0; i < max_touches; i++) {
-
 		touches[i] = NULL;
 	};
 };
@@ -294,11 +277,24 @@ static void clear_touches() {
 			kEAGLDrawablePropertyColorFormat,
 			nil];
 
-	// Create our EAGLContext, and if successful make it current and create our framebuffer.
-	context = [[EAGLContext alloc] initWithAPI:kEAGLRenderingAPIOpenGLES3];
+	// FIXME: Add Vulkan support via MoltenVK. Add fallback code back?
 
-	if (!context || ![EAGLContext setCurrentContext:context] || ![self createFramebuffer]) {
-		[self release];
+	// Create GL ES 2 context
+	if (GLOBAL_GET("rendering/quality/driver/driver_name") == "GLES2") {
+		context = [[EAGLContext alloc] initWithAPI:kEAGLRenderingAPIOpenGLES2];
+		NSLog(@"Setting up an OpenGL ES 2.0 context.");
+		if (!context) {
+			NSLog(@"Failed to create OpenGL ES 2.0 context!");
+			return nil;
+		}
+	}
+
+	if (![EAGLContext setCurrentContext:context]) {
+		NSLog(@"Failed to set EAGLContext!");
+		return nil;
+	}
+	if (![self createFramebuffer]) {
+		NSLog(@"Failed to create frame buffer!");
 		return nil;
 	}
 
@@ -324,11 +320,9 @@ static void clear_touches() {
 // the same size as our display area.
 
 - (void)layoutSubviews {
-	//printf("HERE\n");
 	[EAGLContext setCurrentContext:context];
 	[self destroyFramebuffer];
 	[self createFramebuffer];
-	[self drawView];
 	[self drawView];
 }
 
@@ -395,7 +389,6 @@ static void clear_touches() {
 	active = TRUE;
 	printf("start animation!\n");
 	if (useCADisplayLink) {
-
 		// Approximate frame rate
 		// assumes device refreshes at 60 fps
 		int frameInterval = (int)floor(animationInterval * 60.0f);
@@ -445,22 +438,21 @@ static void clear_touches() {
 
 // Updates the OpenGL view when the timer fires
 - (void)drawView {
+	if (!active) {
+		printf("draw view not active!\n");
+		return;
+	};
 	if (useCADisplayLink) {
 		// Pause the CADisplayLink to avoid recursion
 		[displayLink setPaused:YES];
 
 		// Process all input events
-		while (CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0, TRUE) == kCFRunLoopRunHandledSource)
+		while (CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.0, TRUE) == kCFRunLoopRunHandledSource)
 			;
 
 		// We are good to go, resume the CADisplayLink
 		[displayLink setPaused:NO];
 	}
-
-	if (!active) {
-		printf("draw view not active!\n");
-		return;
-	};
 
 	// Make sure that you are drawing to the current context
 	[EAGLContext setCurrentContext:context];
@@ -481,16 +473,14 @@ static void clear_touches() {
 #ifdef DEBUG_ENABLED
 	GLenum err = glGetError();
 	if (err)
-		NSLog(@"%x error", err);
+		NSLog(@"DrawView: %x error", err);
 #endif
 }
 
 - (void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event {
 	NSArray *tlist = [[event allTouches] allObjects];
 	for (unsigned int i = 0; i < [tlist count]; i++) {
-
 		if ([touches containsObject:[tlist objectAtIndex:i]]) {
-
 			UITouch *touch = [tlist objectAtIndex:i];
 			if (touch.phase != UITouchPhaseBegan)
 				continue;
@@ -503,12 +493,9 @@ static void clear_touches() {
 }
 
 - (void)touchesMoved:(NSSet *)touches withEvent:(UIEvent *)event {
-
 	NSArray *tlist = [[event allTouches] allObjects];
 	for (unsigned int i = 0; i < [tlist count]; i++) {
-
 		if ([touches containsObject:[tlist objectAtIndex:i]]) {
-
 			UITouch *touch = [tlist objectAtIndex:i];
 			if (touch.phase != UITouchPhaseMoved)
 				continue;
@@ -524,9 +511,7 @@ static void clear_touches() {
 - (void)touchesEnded:(NSSet *)touches withEvent:(UIEvent *)event {
 	NSArray *tlist = [[event allTouches] allObjects];
 	for (unsigned int i = 0; i < [tlist count]; i++) {
-
 		if ([touches containsObject:[tlist objectAtIndex:i]]) {
-
 			UITouch *touch = [tlist objectAtIndex:i];
 			if (touch.phase != UITouchPhaseEnded)
 				continue;
@@ -540,7 +525,6 @@ static void clear_touches() {
 }
 
 - (void)touchesCancelled:(NSSet *)touches withEvent:(UIEvent *)event {
-
 	OSIPhone::get_singleton()->touches_cancelled();
 	clear_touches();
 };
@@ -588,7 +572,7 @@ static void clear_touches() {
 	character.parse_utf8([p_text UTF8String]);
 	keyboard_text = keyboard_text + character;
 	OSIPhone::get_singleton()->key(character[0] == 10 ? KEY_ENTER : character[0], true);
-	printf("inserting text with character %i\n", character[0]);
+	printf("inserting text with character %lc\n", (CharType)character[0]);
 };
 
 - (void)audioRouteChangeListenerCallback:(NSNotification *)notification {
@@ -598,7 +582,6 @@ static void clear_touches() {
 	NSInteger routeChangeReason = [[interuptionDict valueForKey:AVAudioSessionRouteChangeReasonKey] integerValue];
 
 	switch (routeChangeReason) {
-
 		case AVAudioSessionRouteChangeReasonNewDeviceAvailable: {
 			NSLog(@"AVAudioSessionRouteChangeReasonNewDeviceAvailable");
 			NSLog(@"Headphone/Line plugged in");
@@ -608,7 +591,6 @@ static void clear_touches() {
 			NSLog(@"AVAudioSessionRouteChangeReasonOldDeviceUnavailable");
 			NSLog(@"Headphone/Line was pulled. Resuming video play....");
 			if (_is_video_playing()) {
-
 				dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 0.5f * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
 					[_instance.avPlayer play]; // NOTE: change this line according your current player implementation
 					NSLog(@"resumed play");
@@ -684,7 +666,6 @@ static void clear_touches() {
 }
 
 - (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context {
-
 	if (object == _instance.avPlayerItem && [keyPath isEqualToString:@"status"]) {
 		if (_instance.avPlayerItem.status == AVPlayerStatusFailed || _instance.avPlayer.status == AVPlayerStatusFailed) {
 			_stop_video();
@@ -694,7 +675,6 @@ static void clear_touches() {
 		if (_instance.avPlayer.status == AVPlayerStatusReadyToPlay &&
 				_instance.avPlayerItem.status == AVPlayerItemStatusReadyToPlay &&
 				CMTIME_COMPARE_INLINE(video_current_time, ==, kCMTimeZero)) {
-
 			//NSLog(@"time: %@", video_current_time);
 
 			[_instance.avPlayer seekToTime:video_current_time];
@@ -718,42 +698,5 @@ static void clear_touches() {
 - (void)playerItemDidReachEnd:(NSNotification *)notification {
 	_stop_video();
 }
-
-/*
-- (void)moviePlayBackDidFinish:(NSNotification*)notification {
-
-
-		NSNumber* reason = [[notification userInfo] objectForKey:MPMoviePlayerPlaybackDidFinishReasonUserInfoKey];
-		switch ([reason intValue]) {
-				case MPMovieFinishReasonPlaybackEnded:
-						//NSLog(@"Playback Ended");
-						break;
-				case MPMovieFinishReasonPlaybackError:
-						//NSLog(@"Playback Error");
-						video_found_error = true;
-						break;
-				case MPMovieFinishReasonUserExited:
-						//NSLog(@"User Exited");
-						video_found_error = true;
-						break;
-				default:
-					//NSLog(@"Unsupported reason!");
-					break;
-		}
-
-		MPMoviePlayerController *player = [notification object];
-
-		[[NSNotificationCenter defaultCenter]
-			removeObserver:self
-			name:MPMoviePlayerPlaybackDidFinishNotification
-			object:player];
-
-		[_instance.moviePlayerController stop];
-		[_instance.moviePlayerController.view removeFromSuperview];
-
-	//[[MPMusicPlayerController applicationMusicPlayer] setVolume: video_previous_volume];
-	video_playing = false;
-}
-*/
 
 @end
